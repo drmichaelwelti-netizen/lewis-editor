@@ -1,0 +1,1198 @@
+<!DOCTYPE html>
+<html lang="de-CH">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lewis-Formel-Editor</title>
+<style>
+:root{
+  /* Werkbank: Werkzeugleiste oben, Periodensystem als Tastenfeld, darunter weisses Zeichenpapier.
+     Bewusst nur Systemschriften und keine externen Dateien: läuft offline und im Safe Exam Browser. */
+  --ground:#e7edef;
+  --surface:#ffffff;
+  --ink:#14191d;
+  --muted:#56636c;
+  --line:#c8d2d8;
+  --accent:#0a6a70;
+  --accent-ink:#ffffff;
+  --accent-tint:#d3ecec;
+  --danger:#a3262d;
+  --ok:#1d7a3a;
+  --font-ui:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,"Helvetica Neue",Arial,sans-serif;
+  --font-chem:"Helvetica Neue",Helvetica,Arial,sans-serif;
+  --font-mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --ch:34px;
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+[hidden]{display:none !important}
+html,body{height:100%;margin:0}
+body{background:var(--ground);color:var(--ink);font-family:var(--font-ui);font-size:15px;line-height:1.35;-webkit-text-size-adjust:100%;overflow:hidden}
+#app{display:flex;flex-direction:column;height:100%}
+button{font:inherit;color:inherit}
+code{font-family:var(--font-mono);font-size:.92em;background:#eef3f4;padding:1px 5px;border-radius:4px}
+
+/* Werkzeugleiste */
+.bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px 12px;background:var(--surface);border-bottom:1px solid var(--line)}
+.brand{font-weight:650;white-space:nowrap;margin-right:2px;line-height:1.1}
+.brand small{display:block;font-weight:400;color:var(--muted);font-size:11px}
+.btn{min-height:44px;min-width:44px;padding:0 12px;border:1px solid var(--line);background:var(--surface);border-radius:10px;display:inline-flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent;white-space:nowrap;user-select:none;-webkit-user-select:none}
+.btn:hover{border-color:#94a7b2}
+.btn:active{background:#eef3f4}
+.btn:disabled{opacity:.38;cursor:default}
+.btn:focus-visible,.cell:focus-visible,summary:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+.btn.primary:active{background:#08575c}
+.btn.danger{color:var(--danger)}
+.btn.icon{padding:0}
+.btn svg{width:20px;height:20px;flex:none;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:12px;padding:3px;background:#f1f5f6;gap:3px}
+.seg .btn{border:none;background:transparent;min-height:40px;border-radius:9px}
+.seg .btn[aria-checked="true"]{background:var(--accent);color:var(--accent-ink)}
+.grp{display:inline-flex;gap:4px}
+.spacer{flex:1}
+@media (max-width:1099px){.brand{display:none}}
+@media (max-width:999px){.lbl-opt{display:none}}
+
+#task{padding:8px 14px;background:#f6f9f9;border-bottom:1px solid var(--line);font-weight:600}
+#task[hidden]{display:none}
+
+/* Periodensystem */
+#pse{background:var(--surface);border-bottom:1px solid var(--line);padding:4px 12px 8px}
+#pse[hidden]{display:none}
+.pse-grid{display:grid;grid-template-columns:repeat(18,minmax(0,1fr));gap:3px;max-width:980px;margin:0 auto}
+.gh{font-size:10px;color:var(--muted);text-align:center;line-height:1;padding-top:2px;letter-spacing:.02em}
+.cell{height:var(--ch);border:1px solid rgba(20,40,50,.06);border-radius:6px;background:var(--cat,#eef1f3);position:relative;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:calc(var(--ch)*.44);cursor:pointer;padding:0;touch-action:manipulation;-webkit-tap-highlight-color:transparent;color:var(--ink);min-width:0;user-select:none;-webkit-user-select:none}
+.cell .z{position:absolute;top:1px;left:3px;font-size:calc(var(--ch)*.23);font-weight:500;color:var(--muted)}
+.small-cells .cell .z{display:none}
+.cell[aria-pressed="true"]{background:var(--accent);color:#fff;border-color:var(--accent)}
+.cell[aria-pressed="true"] .z{color:#cdeeee}
+.cell:disabled{opacity:.25;cursor:default}
+.cell.ph{font-size:calc(var(--ch)*.24);font-weight:500;color:var(--muted);background:#f3f5f6}
+.cell.frow1{margin-top:6px}
+.cell.fb{display:none}
+.show-f .cell.fb{display:flex}
+.c-nm{--cat:#dff0e3}.c-hal{--cat:#e1ecf8}.c-edel{--cat:#ece6f6}.c-alk{--cat:#f8e3dc}.c-erd{--cat:#f7eed8}.c-hm{--cat:#e9eedc}.c-tm{--cat:#e9edf0}.c-met{--cat:#efebe8}.c-f{--cat:#f1eef0}
+#quick{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:6px 12px;background:var(--surface);border-bottom:1px solid var(--line)}
+#quick[hidden]{display:none}
+#quick .cell{width:46px;--ch:40px}
+#quick .note{color:var(--muted);font-size:13px;margin-left:4px}
+
+/* Zeichenfläche */
+#stage{position:relative;flex:1;min-height:0;background:#fff}
+#svg{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+.lbl{font-family:var(--font-chem);font-size:26px;font-weight:500;fill:var(--ink)}
+.bond,.lp{stroke:var(--ink);stroke-width:2.4;stroke-linecap:round;fill:none}
+.dot{fill:var(--ink)}
+.qc{fill:#fff;stroke:var(--ink);stroke-width:1.4}
+.qt{font-family:var(--font-chem);font-size:15px;font-weight:600;fill:var(--ink)}
+.selA{fill:var(--accent-tint);stroke:var(--accent);stroke-width:1.6}
+.selB{stroke:var(--accent);stroke-opacity:.3;stroke-width:13;stroke-linecap:round}
+.hovA{fill:#eef3f4}
+.hovB{stroke:#dfe7ea;stroke-width:12;stroke-linecap:round}
+.rubber{stroke:var(--accent);stroke-width:2;stroke-dasharray:6 5;fill:none}
+.ghost{font-family:var(--font-chem);font-size:26px;fill:var(--accent);opacity:.55}
+.target{fill:none;stroke:var(--accent);stroke-width:2.2}
+.srect{fill:var(--accent);fill-opacity:.07;stroke:var(--accent);stroke-width:1.4;stroke-dasharray:5 4}
+#empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;padding:24px;text-align:center}
+#empty[hidden]{display:none}
+#empty div{color:var(--muted);max-width:34ch;font-size:17px;line-height:1.5}
+#empty b{color:var(--ink)}
+#hint{position:absolute;left:12px;right:12px;bottom:10px;font-size:13px;color:var(--muted);pointer-events:none}
+#hint b{color:var(--ink)}
+#viewctl{position:absolute;top:10px;right:10px;display:flex;flex-direction:column;gap:6px}
+#viewctl .btn{box-shadow:0 2px 8px rgba(16,38,46,.1)}
+#selbar{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);display:none;flex-direction:column;gap:6px;padding:8px;max-width:calc(100% - 24px);width:max-content;background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:0 8px 28px rgba(16,38,46,.16)}
+#selbar.on{display:flex}
+.selrow{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;align-items:center}
+#selbar .btn{min-height:42px;padding:0 10px;font-size:14.5px}
+.stepper{display:inline-flex;align-items:center;gap:3px;border:1px solid var(--line);border-radius:11px;padding:2px 2px 2px 10px;background:#f4f7f8}
+.stepper .lab{font-size:14px;margin-right:4px;white-space:nowrap}
+#selbar .stepper .btn{min-width:44px;min-height:40px;padding:0;border-color:#dde4e8;font-size:21px;font-weight:600;line-height:1}
+#selcount{font-size:13px;color:var(--muted);padding:0 6px;flex:1;min-width:12ch}
+.mini{font-family:var(--font-mono);font-weight:700;letter-spacing:-.04em}
+#toast{position:absolute;top:12px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:10px;font-size:14px;max-width:calc(100% - 24px);text-align:center;opacity:0;pointer-events:none;transition:opacity .2s}
+#toast.on{opacity:1}
+#toast.good{background:var(--ok)}
+#toast.bad{background:var(--danger)}
+@media (prefers-reduced-motion:reduce){#toast{transition:none}}
+
+/* Dialoge */
+.overlay{position:fixed;inset:0;background:rgba(14,26,32,.4);display:none;align-items:center;justify-content:center;padding:16px;z-index:20}
+.overlay.open{display:flex}
+.panel{background:var(--surface);border-radius:16px;width:100%;max-width:700px;max-height:100%;overflow:auto;-webkit-overflow-scrolling:touch;padding:20px 22px 22px;box-shadow:0 18px 50px rgba(10,30,40,.3)}
+.panel.narrow{max-width:460px}
+.phead{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.phead h2{margin:0;font-size:20px;flex:1;text-wrap:balance}
+.panel h3{font-size:15px;margin:18px 0 6px;color:var(--accent)}
+.panel p,.panel li{line-height:1.5;max-width:66ch}
+.panel ul,.panel ol{padding-left:20px;margin:6px 0}
+.panel li{margin:3px 0}
+.kbd{font-family:var(--font-mono);font-size:12px;border:1px solid var(--line);border-bottom-width:2px;border-radius:5px;padding:0 5px;background:#f6f8f9}
+details{margin-top:18px;border-top:1px solid var(--line);padding-top:10px}
+summary{cursor:pointer;font-weight:600;min-height:36px;display:flex;align-items:center}
+table{border-collapse:collapse;width:100%;font-size:14px}
+td,th{border-bottom:1px solid #e3e9ec;padding:6px 6px;text-align:left;vertical-align:top}
+th{color:var(--muted);font-weight:600}
+.codebox{font-family:var(--font-mono);font-size:34px;font-weight:600;letter-spacing:.14em;text-align:center;width:100%;border:2px solid var(--accent);border-radius:12px;padding:12px 8px;color:var(--ink);background:#f4fafa}
+.longbox{font-family:var(--font-mono);font-size:13px;width:100%;min-height:88px;border:1px solid var(--line);border-radius:10px;padding:8px;resize:vertical}
+.row{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.muted{color:var(--muted);font-size:14px}
+.switch{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.switch button{border:none;background:#fff;min-height:40px;padding:0 14px;cursor:pointer}
+.switch button[aria-pressed="true"]{background:var(--accent);color:#fff}
+</style>
+</head>
+<body>
+<div id="app">
+  <header class="bar" id="bar">
+    <div class="brand">Lewis-Formeln<small>Editor</small></div>
+    <div class="seg" role="radiogroup" aria-label="Werkzeug">
+      <button class="btn" id="modeDraw" role="radio" aria-checked="true" title="Zeichnen (Taste 1)">
+        <svg viewBox="0 0 24 24"><path d="M4 20h4L19.5 8.5l-4-4L4 16v4z"/><path d="M13.5 6.5l4 4"/></svg>Zeichnen</button>
+      <button class="btn" id="modeSelect" role="radio" aria-checked="false" title="Auswählen (Taste 2)">
+        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="13" height="13" rx="1.5" stroke-dasharray="2.6 2.6"/><path d="M12.5 12.5l8 3.2-3.4 1.2-1.2 3.4z"/></svg>Auswählen</button>
+    </div>
+    <div class="grp">
+      <button class="btn icon" id="undoBtn" aria-label="Rückgängig" title="Rückgängig"><svg viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg></button>
+      <button class="btn icon" id="redoBtn" aria-label="Wiederholen" title="Wiederholen"><svg viewBox="0 0 24 24"><path d="M15 14l5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg></button>
+    </div>
+    <div class="spacer"></div>
+    <button class="btn" id="pseToggle" aria-pressed="true" title="Periodensystem ein- oder ausblenden"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="4" height="4"/><rect x="17" y="4" width="4" height="4"/><rect x="3" y="10" width="4" height="4"/><rect x="10" y="10" width="4" height="4"/><rect x="17" y="10" width="4" height="4"/><rect x="3" y="16" width="4" height="4"/><rect x="10" y="16" width="4" height="4"/><rect x="17" y="16" width="4" height="4"/></svg><span class="lbl-opt">PSE</span></button>
+    <button class="btn" id="clearBtn" title="Neue Zeichnung"><svg viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M12 11v6M9 14h6"/></svg><span class="lbl-opt">Neu</span></button>
+    <button class="btn" id="helpBtn" title="Anleitung"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 1 1 3.6 2.3c-.8.4-1.2 1-1.2 1.9v.4"/><path d="M12 17.2v.1"/></svg><span class="lbl-opt">Anleitung</span></button>
+    <button class="btn" id="checkBtn" hidden><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Überprüfen</button>
+    <button class="btn primary" id="codeBtn"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h10"/></svg>Antwortcode</button>
+  </header>
+  <div id="task" hidden></div>
+  <section id="pse" aria-label="Periodensystem"><div class="pse-grid" id="pseGrid"></div></section>
+  <div id="quick" hidden></div>
+  <main id="stage">
+    <svg id="svg" aria-label="Zeichenfläche" role="img">
+      <defs>
+        <pattern id="grid" width="30" height="30" patternUnits="userSpaceOnUse"><circle cx="15" cy="15" r="1.1" fill="#d5dde2"/></pattern>
+      </defs>
+      <rect id="gridRect" x="0" y="0" width="100%" height="100%" fill="url(#grid)"/>
+      <g id="view"></g>
+    </svg>
+    <div id="viewctl">
+      <button class="btn icon" id="zoomIn" aria-label="Vergrössern" title="Vergrössern"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M8 11h6M11 8v6M16.5 16.5L21 21"/></svg></button>
+      <button class="btn icon" id="fitBtn" aria-label="Ganze Zeichnung zeigen" title="Einpassen"><svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+      <button class="btn icon" id="zoomOut" aria-label="Verkleinern" title="Verkleinern"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M8 11h6M16.5 16.5L21 21"/></svg></button>
+    </div>
+    <div id="empty"><div>Wähle oben ein <b>Element</b> und tippe auf die Fläche.<br>Tippst du danach auf ein Atom, wird ein neues Atom angebunden.</div></div>
+    <div id="hint"></div>
+    <div id="selbar" role="toolbar" aria-label="Aktionen für die Auswahl">
+      <div class="selrow">
+        <div id="selcount"></div>
+        <button class="btn" id="selAll">Alle</button>
+        <button class="btn danger" id="delBtn" title="Auswahl löschen (Entf)">Löschen</button>
+      </div>
+      <div class="selrow">
+        <div class="stepper" role="group" aria-label="Freie Elektronenpaare"><span class="lab">Elektronenpaar</span>
+          <button class="btn" id="lpAdd" aria-label="Freies Elektronenpaar hinzufügen" title="Freies Elektronenpaar hinzufügen">+</button>
+          <button class="btn" id="lpDel" aria-label="Freies Elektronenpaar entfernen" title="Freies Elektronenpaar entfernen">−</button></div>
+        <div class="stepper" role="group" aria-label="Einzelelektronen" id="radGroup"><span class="lab">Einzelelektron</span>
+          <button class="btn" id="radAdd" aria-label="Einzelelektron hinzufügen" title="Einzelelektron hinzufügen">+</button>
+          <button class="btn" id="radDel" aria-label="Einzelelektron entfernen" title="Einzelelektron entfernen">−</button></div>
+        <div class="stepper" role="group" aria-label="Ladung"><span class="lab">Ladung</span>
+          <button class="btn" id="qPlus" aria-label="Ladung erhöhen" title="Ladung erhöhen">+</button>
+          <button class="btn" id="qMinus" aria-label="Ladung verringern" title="Ladung verringern">−</button></div>
+        <button class="btn" id="elSwap" title="Ausgewählte Atome durch das gewählte Element ersetzen"></button>
+      </div>
+    </div>
+    <div id="toast" role="status" aria-live="polite"></div>
+  </main>
+</div>
+
+<!-- Anleitung -->
+<div class="overlay" id="dlgHelp" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+  <div class="panel">
+    <div class="phead"><h2 id="helpTitle">Anleitung</h2><button class="btn" data-close>Schliessen</button></div>
+    <h3>1 · Element wählen</h3>
+    <p>Tippe im Periodensystem auf ein Element. Es bleibt gewählt, bis du ein anderes antippst. Mit Tastatur: Elementsymbol tippen, z.B. <span class="kbd">O</span> oder <span class="kbd">C</span> <span class="kbd">L</span> für Cl.</p>
+    <h3>2 · Zeichnen (Werkzeug «Zeichnen»)</h3>
+    <ul>
+      <li><b>Leere Fläche antippen:</b> neues einzelnes Atom.</li>
+      <li><b>Atom antippen:</b> ein neues Atom des gewählten Elements wird mit einer Einfachbindung angebunden.</li>
+      <li><b>Bindung antippen:</b> Einfach- → Doppel- → Dreifachbindung → Einfachbindung.</li>
+      <li><b>Von einem Atom zu einem anderen ziehen:</b> Bindung zwischen diesen beiden Atomen, z.B. für Ringe. Ziehst du ins Leere, entsteht dort ein neues Atom.</li>
+    </ul>
+    <h3>3 · Freie Elektronenpaare und Ladungen (Werkzeug «Auswählen»)</h3>
+    <ol>
+      <li>Wechsle zum Werkzeug «Auswählen».</li>
+      <li>Tippe ein oder mehrere Atome an. Oder ziehe auf der leeren Fläche einen Rahmen um die Atome.</li>
+      <li>Unten stehen die Knöpfe <b>+</b> und <b>−</b> für «Elektronenpaar», «Einzelelektron» und «Ladung». Jeder Tipp wirkt auf alle ausgewählten Atome.</li>
+    </ol>
+    <p>Freie Elektronenpaare und Einzelelektronen (Radikale) ordnen sich automatisch um das Atom an.</p>
+    <h3>4 · Verschieben, ersetzen, löschen (Werkzeug «Auswählen»)</h3>
+    <ul>
+      <li><b>Atom ziehen:</b> verschiebt es. Sind mehrere Atome ausgewählt, bewegen sie sich gemeinsam. «Alle» wählt die ganze Zeichnung aus.</li>
+      <li><b>«Element → …»</b> ersetzt die ausgewählten Atome durch das Element, das im Periodensystem gewählt ist.</li>
+      <li><b>«Löschen»</b> entfernt ausgewählte Atome und Bindungen. Taste: <span class="kbd">Entf</span> oder <span class="kbd">⌫</span>.</li>
+      <li><b>Rückgängig und Wiederholen</b> mit den Pfeilen oben. Tasten: <span class="kbd">Ctrl/⌘</span>+<span class="kbd">Z</span> und <span class="kbd">Ctrl</span>+<span class="kbd">Y</span> bzw. <span class="kbd">⌘</span>+<span class="kbd">⇧</span>+<span class="kbd">Z</span>.</li>
+    </ul>
+    <h3>5 · Ansicht</h3>
+    <ul>
+      <li><b>Zwei Finger</b> auf der Fläche: zoomen und verschieben. Im Werkzeug «Zeichnen» verschiebt auch das Ziehen auf der leeren Fläche die Ansicht.</li>
+      <li><b>Lupen</b> rechts oben auf der Fläche: vergrössern und verkleinern. Der Knopf dazwischen zeigt die ganze Zeichnung.</li>
+      <li><b>PSE</b> blendet das Periodensystem aus, damit du mehr Platz hast. Häufige Elemente bleiben dann als Kurzwahl sichtbar.</li>
+      <li>Tasten <span class="kbd">1</span> und <span class="kbd">2</span> wechseln zwischen «Zeichnen» und «Auswählen».</li>
+    </ul>
+    <h3>6 · Abgeben</h3>
+    <p>Bist du fertig, tippe auf <b>«Antwortcode»</b>. Trage den 8-stelligen Code in isTest ins Antwortfeld ein, mit «Kopieren» und Einfügen oder durch Abtippen. Jede Änderung an der Zeichnung ergibt einen neuen Code. Erstelle den Code deshalb erst ganz am Schluss.</p>
+    <p class="muted">Deine Zeichnung bleibt auf diesem Gerät gespeichert, auch wenn die Seite neu lädt. Die App sendet keine Daten.</p>
+
+    <details id="teacher">
+      <summary>Für Lehrpersonen</summary>
+      <h3>Lösungscode erstellen</h3>
+      <p>Zeichne die richtige Lewis-Formel und öffne «Antwortcode». Hinterlege diesen Code in isTest als richtige Antwort, z.B. im Fragetyp «Einfacher Text». Sind mehrere Formeln richtig (z.B. Grenzformeln), trägst du jeden Code als Alternative ein.</p>
+      <p>Der Code hängt nur von den Atomen, Bindungen, freien Elektronenpaaren, Einzelelektronen und Ladungen ab. Wo die Atome liegen und auf welcher Seite die Elektronenpaare sitzen, spielt keine Rolle. Erstelle Lösungscodes mit derselben Version der App, die auch in der Prüfung läuft (Code-Version <span id="cv"></span>).</p>
+      <h3>Zeichnung einer Schülerin ansehen</h3>
+      <p>Mit der Einstellung <code>abgabe=zeichnung</code> oder <code>abgabe=beide</code> erhalten die Lernenden einen langen Zeichnungscode (für eine «Offene Frage»). Füge ihn hier ein, um die Zeichnung zu sehen:</p>
+      <textarea class="longbox" id="loadArea" placeholder="LEWIS1/…" aria-label="Zeichnungscode einfügen"></textarea>
+      <div class="row"><button class="btn" id="loadBtn">Zeichnung laden</button><span class="muted" id="loadMsg"></span></div>
+      <h3>Einstellungen über die Adresse</h3>
+      <p class="muted">Beispiel: <code>…/index.html?id=nh3&amp;aufgabe=Lewis-Formel%20von%20NH3</code>. Die gleichen Werte lassen sich oben im Quelltext im Block «EINSTELLUNGEN» festlegen (nötig beim Einbetten als Code, z.B. in Google Sites).</p>
+      <table>
+        <tr><th>Parameter</th><th>Wirkung</th></tr>
+        <tr><td><code>id</code></td><td>Eindeutiger Name der Aufgabe. Nötig, wenn eine Prüfung mehrere Lewis-Aufgaben enthält, sonst teilen sie sich den Speicher.</td></tr>
+        <tr><td><code>aufgabe</code></td><td>Aufgabentext über der Zeichenfläche.</td></tr>
+        <tr><td><code>paare</code></td><td><code>strich</code> (Standard) oder <code>punkte</code>.</td></tr>
+        <tr><td><code>abgabe</code></td><td><code>code</code> (Standard), <code>zeichnung</code> oder <code>beide</code>.</td></tr>
+        <tr><td><code>loesung</code></td><td>Übungsmodus: Lösungscode(s), mit Komma getrennt. Zeigt den Knopf «Überprüfen».</td></tr>
+        <tr><td><code>elemente</code></td><td>Nur diese Elemente anbieten, z.B. <code>H,C,N,O</code>.</td></tr>
+        <tr><td><code>radikale</code></td><td><code>0</code> blendet die Knöpfe für Einzelelektronen aus.</td></tr>
+        <tr><td><code>start</code></td><td>Anfangs gewähltes Element, z.B. <code>H</code>.</td></tr>
+      </table>
+      <h3>Darstellung freier Elektronenpaare</h3>
+      <div class="switch" role="group" aria-label="Darstellung freier Elektronenpaare"><button id="lpStrich" aria-pressed="true">Striche</button><button id="lpPunkte" aria-pressed="false">Punkte</button></div>
+      <h3>Beispiele</h3>
+      <div class="row"><button class="btn" data-ex="h2o">Wasser</button><button class="btn" data-ex="co2">Kohlenstoffdioxid</button><button class="btn" data-ex="nh4">Ammonium-Ion</button></div>
+      <p class="muted">Ein Beispiel ersetzt die aktuelle Zeichnung. «Rückgängig» holt sie zurück.</p>
+    </details>
+  </div>
+</div>
+
+<!-- Antwortcode -->
+<div class="overlay" id="dlgCode" role="dialog" aria-modal="true" aria-labelledby="codeTitle">
+  <div class="panel narrow">
+    <div class="phead"><h2 id="codeTitle">Antwortcode</h2><button class="btn" data-close>Schliessen</button></div>
+    <div id="codeBody"></div>
+  </div>
+</div>
+
+<!-- Bestätigen -->
+<div class="overlay" id="dlgConfirm" role="dialog" aria-modal="true" aria-labelledby="confTitle">
+  <div class="panel narrow">
+    <h2 id="confTitle" style="margin:0 0 8px;font-size:20px">Ganze Zeichnung löschen?</h2>
+    <p class="muted">Mit «Rückgängig» kannst du sie wiederherstellen.</p>
+    <div class="row"><button class="btn" data-close>Abbrechen</button><button class="btn primary" id="confOk">Löschen</button></div>
+  </div>
+</div>
+
+<script>
+(function(){
+'use strict';
+
+/* ============================================================
+   EINSTELLUNGEN FÜR LEHRPERSONEN
+   Werte hier ändern oder über die Adresse setzen, z.B.
+   index.html?id=nh3&aufgabe=Zeichne%20die%20Lewis-Formel%20von%20NH3
+   ============================================================ */
+var CONFIG = {
+  aufgabe: '',      // Aufgabentext über der Zeichenfläche (leer = keiner)
+  id: '',           // eindeutiger Name je Aufgabe (bei mehreren Aufgaben in einer Prüfung nötig)
+  paare: 'strich',  // freie Elektronenpaare als 'strich' oder 'punkte'
+  abgabe: 'code',   // 'code' = kurzer Antwortcode, 'zeichnung' = langer Zeichnungscode, 'beide'
+  loesung: '',      // Übungsmodus: Lösungscode(s), mit Komma getrennt -> Knopf «Überprüfen»
+  elemente: '',     // nur diese Elemente anbieten, z.B. 'H,C,N,O' (leer = alle)
+  radikale: true,   // Knöpfe für Einzelelektronen (Radikale) zeigen (false = ausblenden)
+  start: 'C'        // anfangs gewähltes Element
+};
+/* ============================================================ */
+
+var URL_SET = {};
+try {
+  var q = new URLSearchParams(location.search);
+  Object.keys(CONFIG).forEach(function(k){
+    if (q.has(k)) {
+      var v = q.get(k);
+      CONFIG[k] = (typeof CONFIG[k] === 'boolean') ? !/^(0|false|nein|no)$/i.test(v) : v;
+      URL_SET[k] = true;
+    }
+  });
+} catch (e) {}
+
+var CODE_VERSION = 1;
+var L = 60;                 // Bindungslänge in Zeichnungseinheiten
+var HIT_ATOM = 24, HIT_BOND = 14, TAP_SLOP = 9;
+var MAX_LP = 4, MAX_RAD = 3, MAX_Q = 4;
+
+/* ---------- Elementdaten ---------- */
+var NAMES = ('H Wasserstoff,He Helium,Li Lithium,Be Beryllium,B Bor,C Kohlenstoff,N Stickstoff,O Sauerstoff,F Fluor,Ne Neon,' +
+ 'Na Natrium,Mg Magnesium,Al Aluminium,Si Silicium,P Phosphor,S Schwefel,Cl Chlor,Ar Argon,K Kalium,Ca Calcium,' +
+ 'Sc Scandium,Ti Titan,V Vanadium,Cr Chrom,Mn Mangan,Fe Eisen,Co Cobalt,Ni Nickel,Cu Kupfer,Zn Zink,' +
+ 'Ga Gallium,Ge Germanium,As Arsen,Se Selen,Br Brom,Kr Krypton,Rb Rubidium,Sr Strontium,Y Yttrium,Zr Zirconium,' +
+ 'Nb Niob,Mo Molybdän,Tc Technetium,Ru Ruthenium,Rh Rhodium,Pd Palladium,Ag Silber,Cd Cadmium,In Indium,Sn Zinn,' +
+ 'Sb Antimon,Te Tellur,I Iod,Xe Xenon,Cs Caesium,Ba Barium,La Lanthan,Ce Cer,Pr Praseodym,Nd Neodym,' +
+ 'Pm Promethium,Sm Samarium,Eu Europium,Gd Gadolinium,Tb Terbium,Dy Dysprosium,Ho Holmium,Er Erbium,Tm Thulium,Yb Ytterbium,' +
+ 'Lu Lutetium,Hf Hafnium,Ta Tantal,W Wolfram,Re Rhenium,Os Osmium,Ir Iridium,Pt Platin,Au Gold,Hg Quecksilber,' +
+ 'Tl Thallium,Pb Blei,Bi Bismut,Po Polonium,At Astat,Rn Radon,Fr Francium,Ra Radium,Ac Actinium,Th Thorium,' +
+ 'Pa Protactinium,U Uran,Np Neptunium,Pu Plutonium,Am Americium,Cm Curium,Bk Berkelium,Cf Californium,Es Einsteinium,Fm Fermium,' +
+ 'Md Mendelevium,No Nobelium,Lr Lawrencium,Rf Rutherfordium,Db Dubnium,Sg Seaborgium,Bh Bohrium,Hs Hassium,Mt Meitnerium,Ds Darmstadtium,' +
+ 'Rg Roentgenium,Cn Copernicium,Nh Nihonium,Fl Flerovium,Mc Moscovium,Lv Livermorium,Ts Tenness,Og Oganesson').split(',');
+var CAT_SETS = { nm:'H C N O P S Se', hal:'F Cl Br I At Ts', edel:'He Ne Ar Kr Xe Rn Og', alk:'Li Na K Rb Cs Fr',
+  erd:'Be Mg Ca Sr Ba Ra', hm:'B Si Ge As Sb Te', met:'Al Ga In Sn Tl Pb Bi Po Nh Fl Mc Lv' };
+var CAT_NAME = { nm:'Nichtmetall', hal:'Halogen', edel:'Edelgas', alk:'Alkalimetall', erd:'Erdalkalimetall', hm:'Halbmetall', met:'Metall', tm:'Übergangsmetall', f:'Lanthanoid/Actinoid' };
+var CAT = {};
+Object.keys(CAT_SETS).forEach(function(k){ CAT_SETS[k].split(' ').forEach(function(s){ CAT[s] = k; }); });
+
+function place(z){
+  if (z === 1) return {row:1, col:1};
+  if (z === 2) return {row:1, col:18};
+  if (z <= 10) return {row:2, col: z <= 4 ? z - 2 : z + 8};
+  if (z <= 18) return {row:3, col: z <= 12 ? z - 10 : z};
+  if (z <= 36) return {row:4, col: z - 18};
+  if (z <= 54) return {row:5, col: z - 36};
+  if (z <= 56) return {row:6, col: z - 54};
+  if (z <= 71) return {row:9, col: z - 57 + 4, f:true};
+  if (z <= 86) return {row:6, col: z - 68};
+  if (z <= 88) return {row:7, col: z - 86};
+  if (z <= 103) return {row:10, col: z - 89 + 4, f:true};
+  return {row:7, col: z - 100};
+}
+var SYM = {};
+var ELEMENTS = NAMES.map(function(s, i){
+  var sp = s.indexOf(' '), sym = s.slice(0, sp), name = s.slice(sp + 1), z = i + 1, p = place(z);
+  var e = { z:z, sym:sym, name:name, row:p.row, col:p.col, f:!!p.f, cat: CAT[sym] || (p.f ? 'f' : 'tm') };
+  SYM[sym] = e;
+  return e;
+});
+var allowed = null;
+if (CONFIG.elemente) {
+  allowed = {};
+  String(CONFIG.elemente).split(/[\s,;]+/).forEach(function(s){ if (SYM[s]) allowed[s] = true; });
+  if (!Object.keys(allowed).length) allowed = null;
+}
+function isAllowed(sym){ return !!SYM[sym] && (!allowed || !!allowed[sym]); }
+
+/* ---------- Zustand ---------- */
+var S = {
+  atoms: [], bonds: [], nextId: 1,
+  el: isAllowed(CONFIG.start) ? CONFIG.start : (allowed ? Object.keys(allowed)[0] : 'C'),
+  mode: 'draw',
+  selA: {}, selB: {},
+  view: { s: 1, tx: 0, ty: 0 },
+  lpStyle: CONFIG.paare === 'punkte' ? 'punkte' : 'strich',
+  fblock: false, pseOpen: true,
+  hover: null, overlay: null
+};
+var undoStack = [], redoStack = [];
+
+var $ = function(id){ return document.getElementById(id); };
+var svg = $('svg'), viewG = $('view'), stage = $('stage');
+
+/* ---------- Hilfsfunktionen ---------- */
+function deg(r){ return r * 180 / Math.PI; }
+function rad(d){ return d * Math.PI / 180; }
+function angDiff(a, b){ var d = Math.abs(a - b) % 360; return d > 180 ? 360 - d : d; }
+function cmpKey(a, b){ for (var i = 0; i < a.length; i++){ if (a[i] !== b[i]) return a[i] > b[i] ? 1 : -1; } return 0; }
+function clamp(v, lo, hi){ return Math.max(lo, Math.min(hi, v)); }
+function atomMap(){ var m = {}; S.atoms.forEach(function(a){ m[a.id] = a; }); return m; }
+function selCount(o){ return Object.keys(o).length; }
+function selectedAtoms(){ return S.atoms.filter(function(a){ return S.selA[a.id]; }); }
+function neighborAngles(a, amap){
+  amap = amap || atomMap();
+  var out = [];
+  S.bonds.forEach(function(b){
+    var o = b.a === a.id ? amap[b.b] : (b.b === a.id ? amap[b.a] : null);
+    if (o) out.push((deg(Math.atan2(o.y - a.y, o.x - a.x)) + 360) % 360);
+  });
+  return out;
+}
+function findBond(i, j){ for (var k = 0; k < S.bonds.length; k++){ var b = S.bonds[k]; if ((b.a === i && b.b === j) || (b.a === j && b.b === i)) return b; } return null; }
+
+/* ---------- Verlauf ---------- */
+function snapshot(){ return JSON.stringify({ atoms:S.atoms, bonds:S.bonds, nextId:S.nextId }); }
+function restore(str){ var d = JSON.parse(str); S.atoms = d.atoms; S.bonds = d.bonds; S.nextId = d.nextId; }
+function commit(){ undoStack.push(snapshot()); if (undoStack.length > 200) undoStack.shift(); redoStack = []; }
+function undo(){ if (!undoStack.length) return; redoStack.push(snapshot()); restore(undoStack.pop()); pruneSel(); changed(); }
+function redo(){ if (!redoStack.length) return; undoStack.push(snapshot()); restore(redoStack.pop()); pruneSel(); changed(); }
+function pruneSel(){
+  var am = atomMap(), bm = {};
+  S.bonds.forEach(function(b){ bm[b.id] = 1; });
+  Object.keys(S.selA).forEach(function(k){ if (!am[k]) delete S.selA[k]; });
+  Object.keys(S.selB).forEach(function(k){ if (!bm[k]) delete S.selB[k]; });
+}
+
+/* ---------- Speichern auf dem Gerät ---------- */
+var STORE_KEY = 'lewis-editor:v1:' + (CONFIG.id || (location.pathname + location.search));
+var saveTimer = null;
+function save(){
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(function(){
+    try { localStorage.setItem(STORE_KEY, snapshot()); } catch (e) {}
+  }, 250);
+}
+function loadSaved(){
+  try {
+    var d = JSON.parse(localStorage.getItem(STORE_KEY) || 'null');
+    if (d && Array.isArray(d.atoms) && Array.isArray(d.bonds)) {
+      S.atoms = d.atoms.filter(function(a){ return a && SYM[a.el] && isFinite(a.x) && isFinite(a.y); });
+      var ids = {}; S.atoms.forEach(function(a){ ids[a.id] = 1; a.lp = a.lp|0; a.q = a.q|0; a.rad = a.rad|0; });
+      S.bonds = d.bonds.filter(function(b){ return b && ids[b.a] && ids[b.b] && b.a !== b.b; });
+      S.nextId = Math.max(d.nextId|0, 1);
+      return S.atoms.length > 0;
+    }
+  } catch (e) {}
+  return false;
+}
+try { var st = localStorage.getItem('lewis-editor:paare'); if (st && !URL_SET.paare) S.lpStyle = st; } catch (e) {}
+
+/* ---------- Bearbeiten ---------- */
+function addAtom(x, y, el){ var a = { id:S.nextId++, el:el, x:x, y:y, lp:0, q:0, rad:0 }; S.atoms.push(a); return a; }
+function addBond(i, j, order){ var b = { id:S.nextId++, a:i, b:j, order:order || 1 }; S.bonds.push(b); return b; }
+
+function bestBondAngle(a){
+  var nb = neighborAngles(a);
+  var order = [0, 180, 270, 90, 315, 45, 225, 135];
+  var best = 0, bestKey = null;
+  order.forEach(function(ang, idx){
+    var x = a.x + L * Math.cos(rad(ang)), y = a.y + L * Math.sin(rad(ang));
+    var blocked = S.atoms.some(function(o){ return o !== a && Math.hypot(o.x - x, o.y - y) < L * 0.55; });
+    var sep = 360;
+    nb.forEach(function(b){ sep = Math.min(sep, angDiff(ang, b)); });
+    var key = [blocked ? 0 : 1, sep, -idx];
+    if (!bestKey || cmpKey(key, bestKey) > 0) { best = ang; bestKey = key; }
+  });
+  return best;
+}
+function growFrom(a){
+  commit();
+  var ang = bestBondAngle(a);
+  var n = addAtom(a.x + L * Math.cos(rad(ang)), a.y + L * Math.sin(rad(ang)), S.el);
+  addBond(a.id, n.id, 1);
+  changed();
+}
+function cycleBond(b){ commit(); b.order = b.order % 3 + 1; changed(); }
+
+function applyToSelected(fn){
+  var atoms = selectedAtoms();
+  var before = snapshot();
+  var changedAny = false;
+  atoms.forEach(function(a){ if (fn(a)) changedAny = true; });
+  if (changedAny) { undoStack.push(before); if (undoStack.length > 200) undoStack.shift(); redoStack = []; changed(); }
+  else updateUI();
+}
+function deleteSelection(){
+  if (!selCount(S.selA) && !selCount(S.selB)) return;
+  commit();
+  S.atoms = S.atoms.filter(function(a){ return !S.selA[a.id]; });
+  S.bonds = S.bonds.filter(function(b){ return !S.selB[b.id] && !S.selA[b.a] && !S.selA[b.b]; });
+  S.selA = {}; S.selB = {};
+  changed();
+}
+function clearSel(){ S.selA = {}; S.selB = {}; }
+
+/* ---------- Lage freier Elektronenpaare ---------- */
+var DIRS = [270, 90, 180, 0, 315, 225, 45, 135]; // oben, unten, links, rechts, dann diagonal
+function placeAround(nb, k){
+  k = Math.min(k, 8);
+  if (k <= 0) return [];
+  var best = null, bestKey = null, idx = [], i, j;
+  for (i = 0; i < k; i++) idx.push(i);
+  while (true) {
+    var chosen = idx.map(function(t){ return DIRS[t]; });
+    var minSep = 360, sum = 0;
+    for (i = 0; i < k; i++) {
+      var m = 360;
+      for (j = 0; j < nb.length; j++) m = Math.min(m, angDiff(chosen[i], nb[j]));
+      for (j = 0; j < k; j++) if (j !== i) m = Math.min(m, angDiff(chosen[i], chosen[j]));
+      minSep = Math.min(minSep, m); sum += m;
+    }
+    var pref = idx.reduce(function(s, t){ return s + t; }, 0);
+    var card = chosen.filter(function(c){ return c % 90 === 0; }).length;
+    var key = [minSep, card, sum, -pref];
+    if (!bestKey || cmpKey(key, bestKey) > 0) { best = chosen.slice(); bestKey = key; }
+    i = k - 1;
+    while (i >= 0 && idx[i] === 8 - k + i) i--;
+    if (i < 0) break;
+    idx[i]++;
+    for (j = i + 1; j < k; j++) idx[j] = idx[j - 1] + 1;
+  }
+  return best;
+}
+function chargeAngle(used){
+  var cand = [315, 45, 225, 135, 270, 0, 90, 180], best = 315, bestKey = null;
+  cand.forEach(function(c, idx){
+    var sep = 360;
+    used.forEach(function(u){ sep = Math.min(sep, angDiff(c, u)); });
+    var key = [Math.min(sep, 90), -idx];
+    if (!bestKey || cmpKey(key, bestKey) > 0) { best = c; bestKey = key; }
+  });
+  return best;
+}
+function labelR(a){ return { rx: a.el.length > 1 ? 16.5 : 10.5, ry: 12.5 }; }
+function edgeDist(a, ux, uy){ var r = labelR(a); return 1 / Math.sqrt((ux / r.rx) * (ux / r.rx) + (uy / r.ry) * (uy / r.ry)); }
+
+/* ---------- Darstellung ---------- */
+function f1(n){ return Math.round(n * 10) / 10; }
+function render(){
+  var v = S.view;
+  $('grid').setAttribute('patternTransform', 'translate(' + f1(v.tx) + ',' + f1(v.ty) + ') scale(' + v.s + ')');
+  viewG.setAttribute('transform', 'translate(' + f1(v.tx) + ',' + f1(v.ty) + ') scale(' + v.s + ')');
+  var am = atomMap(), out = [];
+  var hv = S.hover;
+
+  // Hervorhebungen (unter allem)
+  S.bonds.forEach(function(b){
+    var A = am[b.a], B = am[b.b]; if (!A || !B) return;
+    if (S.selB[b.id]) out.push('<line class="selB" x1="' + f1(A.x) + '" y1="' + f1(A.y) + '" x2="' + f1(B.x) + '" y2="' + f1(B.y) + '"/>');
+    else if (hv && hv.t === 'b' && hv.id === b.id) out.push('<line class="hovB" x1="' + f1(A.x) + '" y1="' + f1(A.y) + '" x2="' + f1(B.x) + '" y2="' + f1(B.y) + '"/>');
+  });
+  S.atoms.forEach(function(a){
+    var r = labelR(a);
+    if (S.selA[a.id]) out.push('<ellipse class="selA" cx="' + f1(a.x) + '" cy="' + f1(a.y) + '" rx="' + (r.rx + 8) + '" ry="' + (r.ry + 8) + '"/>');
+    else if (hv && hv.t === 'a' && hv.id === a.id) out.push('<ellipse class="hovA" cx="' + f1(a.x) + '" cy="' + f1(a.y) + '" rx="' + (r.rx + 8) + '" ry="' + (r.ry + 8) + '"/>');
+  });
+
+  // Bindungen
+  S.bonds.forEach(function(b){
+    var A = am[b.a], B = am[b.b]; if (!A || !B) return;
+    var dx = B.x - A.x, dy = B.y - A.y, len = Math.hypot(dx, dy) || 1, ux = dx / len, uy = dy / len;
+    var ta = edgeDist(A, ux, uy) + 3, tb = edgeDist(B, -ux, -uy) + 3;
+    if (ta + tb > len - 6) { var sc = Math.max(0, (len - 6) / (ta + tb)); ta *= sc; tb *= sc; }
+    var x1 = A.x + ux * ta, y1 = A.y + uy * ta, x2 = B.x - ux * tb, y2 = B.y - uy * tb, nx = -uy, ny = ux;
+    var offs = b.order === 1 ? [0] : b.order === 2 ? [-4.2, 4.2] : [-6.8, 0, 6.8];
+    offs.forEach(function(o){
+      out.push('<line class="bond" x1="' + f1(x1 + nx * o) + '" y1="' + f1(y1 + ny * o) + '" x2="' + f1(x2 + nx * o) + '" y2="' + f1(y2 + ny * o) + '"/>');
+    });
+  });
+
+  // Atome, Elektronenpaare, Ladungen
+  S.atoms.forEach(function(a){
+    out.push('<text class="lbl" x="' + f1(a.x) + '" y="' + f1(a.y) + '" dy="0.35em" text-anchor="middle">' + a.el + '</text>');
+    var nb = neighborAngles(a, am);
+    var lp = a.lp | 0, rd = a.rad | 0;
+    var angs = placeAround(nb, lp + rd);
+    angs.forEach(function(ang, i){
+      var ux = Math.cos(rad(ang)), uy = Math.sin(rad(ang));
+      var d = edgeDist(a, ux, uy) + 5.5;
+      var cx = a.x + ux * d, cy = a.y + uy * d, px = -uy, py = ux;
+      if (i < lp) {
+        if (S.lpStyle === 'punkte') {
+          out.push('<circle class="dot" cx="' + f1(cx + px * 4) + '" cy="' + f1(cy + py * 4) + '" r="2.4"/><circle class="dot" cx="' + f1(cx - px * 4) + '" cy="' + f1(cy - py * 4) + '" r="2.4"/>');
+        } else {
+          out.push('<line class="lp" x1="' + f1(cx + px * 7.5) + '" y1="' + f1(cy + py * 7.5) + '" x2="' + f1(cx - px * 7.5) + '" y2="' + f1(cy - py * 7.5) + '"/>');
+        }
+      } else {
+        out.push('<circle class="dot" cx="' + f1(cx) + '" cy="' + f1(cy) + '" r="2.6"/>');
+      }
+    });
+    if (a.q) {
+      var ca = chargeAngle(nb.concat(angs)), ux2 = Math.cos(rad(ca)), uy2 = Math.sin(rad(ca));
+      var dd = edgeDist(a, ux2, uy2) + 13, qx = a.x + ux2 * dd, qy = a.y + uy2 * dd;
+      if (Math.abs(a.q) === 1) {
+        out.push('<circle class="qc" cx="' + f1(qx) + '" cy="' + f1(qy) + '" r="7.5"/>');
+        out.push('<line class="bond" style="stroke-width:1.6" x1="' + f1(qx - 4) + '" y1="' + f1(qy) + '" x2="' + f1(qx + 4) + '" y2="' + f1(qy) + '"/>');
+        if (a.q > 0) out.push('<line class="bond" style="stroke-width:1.6" x1="' + f1(qx) + '" y1="' + f1(qy - 4) + '" x2="' + f1(qx) + '" y2="' + f1(qy + 4) + '"/>');
+      } else {
+        out.push('<text class="qt" x="' + f1(qx) + '" y="' + f1(qy) + '" dy="0.35em" text-anchor="middle">' + Math.abs(a.q) + (a.q > 0 ? '+' : '−') + '</text>');
+      }
+    }
+  });
+
+  // Überlagerungen
+  var ov = S.overlay;
+  if (ov && ov.t === 'rubber') {
+    var A0 = am[ov.from];
+    if (A0) {
+      var tgt = ov.target ? am[ov.target] : null;
+      var ex = tgt ? tgt.x : ov.x, ey = tgt ? tgt.y : ov.y;
+      out.push('<line class="rubber" x1="' + f1(A0.x) + '" y1="' + f1(A0.y) + '" x2="' + f1(ex) + '" y2="' + f1(ey) + '"/>');
+      if (tgt) { var tr = labelR(tgt); out.push('<ellipse class="target" cx="' + f1(tgt.x) + '" cy="' + f1(tgt.y) + '" rx="' + (tr.rx + 9) + '" ry="' + (tr.ry + 9) + '"/>'); }
+      else out.push('<text class="ghost" x="' + f1(ov.x) + '" y="' + f1(ov.y) + '" dy="0.35em" text-anchor="middle">' + S.el + '</text>');
+    }
+  } else if (ov && ov.t === 'rect') {
+    var x = Math.min(ov.x1, ov.x2), y = Math.min(ov.y1, ov.y2);
+    out.push('<rect class="srect" x="' + f1(x) + '" y="' + f1(y) + '" width="' + f1(Math.abs(ov.x2 - ov.x1)) + '" height="' + f1(Math.abs(ov.y2 - ov.y1)) + '"/>');
+  }
+  viewG.innerHTML = out.join('');
+}
+
+/* ---------- Oberfläche ---------- */
+function updateUI(){
+  $('modeDraw').setAttribute('aria-checked', S.mode === 'draw');
+  $('modeSelect').setAttribute('aria-checked', S.mode === 'select');
+  $('undoBtn').disabled = !undoStack.length;
+  $('redoBtn').disabled = !redoStack.length;
+  $('empty').hidden = S.atoms.length > 0;
+  var nA = selCount(S.selA), nB = selCount(S.selB);
+  var sb = $('selbar');
+  sb.classList.toggle('on', S.mode === 'select');
+  if (S.mode === 'select') {
+    var parts = [];
+    if (nA) parts.push(nA + (nA === 1 ? ' Atom' : ' Atome'));
+    if (nB) parts.push(nB + (nB === 1 ? ' Bindung' : ' Bindungen'));
+    $('selcount').textContent = parts.length ? parts.join(', ') + ' ausgewählt' : 'Atome antippen oder Rahmen ziehen.';
+    ['lpAdd', 'lpDel', 'radAdd', 'radDel', 'qPlus', 'qMinus', 'elSwap'].forEach(function(id){ $(id).disabled = !nA; });
+    $('delBtn').disabled = !(nA || nB);
+    $('selAll').disabled = !S.atoms.length;
+    $('elSwap').innerHTML = 'Element <span class="mini">→</span> ' + S.el;
+  }
+  var h = $('hint');
+  h.hidden = S.mode !== 'draw';
+  h.innerHTML = 'Zeichnen mit <b>' + S.el + '</b> · Fläche antippen: neues Atom · Atom antippen: ' + S.el + ' anbinden · Bindung antippen: Einfach/Doppel/Dreifach';
+  document.querySelectorAll('.cell[data-sym]').forEach(function(c){ c.setAttribute('aria-pressed', c.getAttribute('data-sym') === S.el); });
+  $('pseToggle').setAttribute('aria-pressed', S.pseOpen);
+  $('pse').hidden = !S.pseOpen;
+  $('quick').hidden = S.pseOpen;
+  if (!S.pseOpen) buildQuick();
+  $('pseGrid').classList.toggle('show-f', S.fblock);
+  $('lpStrich').setAttribute('aria-pressed', S.lpStyle !== 'punkte');
+  $('lpPunkte').setAttribute('aria-pressed', S.lpStyle === 'punkte');
+}
+function changed(){ render(); updateUI(); save(); }
+
+function setMode(m){
+  if (S.mode === m) return;
+  S.mode = m;
+  if (m === 'draw') clearSel();
+  S.overlay = null;
+  render(); updateUI();
+}
+function setElement(sym){
+  if (!isAllowed(sym)) return;
+  S.el = sym;
+  updateUI();
+}
+
+/* ---------- Periodensystem ---------- */
+function cellButton(e, extraClass){
+  var b = document.createElement('button');
+  b.className = 'cell c-' + e.cat + (extraClass ? ' ' + extraClass : '');
+  b.setAttribute('data-sym', e.sym);
+  b.setAttribute('aria-pressed', 'false');
+  b.setAttribute('aria-label', e.name + ' (' + e.sym + ')');
+  b.title = e.name + ' · ' + CAT_NAME[e.cat] + ' · Ordnungszahl ' + e.z;
+  b.innerHTML = '<span class="z">' + e.z + '</span>' + e.sym;
+  if (!isAllowed(e.sym)) b.disabled = true;
+  b.addEventListener('click', function(){ setElement(e.sym); });
+  return b;
+}
+function buildPSE(){
+  var g = $('pseGrid');
+  g.innerHTML = '';
+  var heads = { 1:'I', 2:'II', 13:'III', 14:'IV', 15:'V', 16:'VI', 17:'VII', 18:'VIII' };
+  Object.keys(heads).forEach(function(c){
+    var d = document.createElement('div');
+    d.className = 'gh'; d.textContent = heads[c];
+    d.style.gridColumn = c; d.style.gridRow = 1;
+    g.appendChild(d);
+  });
+  ELEMENTS.forEach(function(e){
+    var b = cellButton(e, e.f ? ('fb' + (e.row === 9 ? ' frow1' : '')) : '');
+    b.style.gridColumn = e.col;
+    b.style.gridRow = e.row + 1;
+    g.appendChild(b);
+  });
+  [[6, '57–71', 'Lanthanoide'], [7, '89–103', 'Actinoide']].forEach(function(p){
+    var b = document.createElement('button');
+    b.className = 'cell ph';
+    b.style.gridColumn = 3; b.style.gridRow = p[0] + 1;
+    b.textContent = p[1];
+    b.setAttribute('aria-label', p[2] + ' ein- oder ausblenden');
+    b.title = p[2] + ' ein- oder ausblenden';
+    b.addEventListener('click', function(){ S.fblock = !S.fblock; updateUI(); });
+    g.appendChild(b);
+  });
+}
+function buildQuick(){
+  var q = $('quick');
+  var list = ['H', 'C', 'N', 'O', 'F', 'P', 'S', 'Cl', 'Br', 'I'].filter(isAllowed);
+  if (allowed) list = Object.keys(allowed);
+  if (list.indexOf(S.el) < 0) list.push(S.el);
+  q.innerHTML = '';
+  list.forEach(function(s){ q.appendChild(cellButton(SYM[s])); });
+  var n = document.createElement('span');
+  n.className = 'note'; n.textContent = 'Weitere Elemente: «PSE» oben einblenden';
+  q.appendChild(n);
+  q.querySelectorAll('.cell[data-sym]').forEach(function(c){ c.setAttribute('aria-pressed', c.getAttribute('data-sym') === S.el); });
+}
+function sizePSE(){
+  var h = window.innerHeight;
+  var ch = clamp(Math.round(h * 0.041), 22, 38);
+  document.documentElement.style.setProperty('--ch', ch + 'px');
+  $('pseGrid').classList.toggle('small-cells', ch < 27);
+}
+
+/* ---------- Koordinaten und Trefferprüfung ---------- */
+function pt(e){ var r = svg.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
+function toWorld(p){ var v = S.view; return { x: (p.x - v.tx) / v.s, y: (p.y - v.ty) / v.s }; }
+function hitAtom(w, exceptId){
+  var r = clamp(HIT_ATOM / S.view.s, 16, 28), best = null, bd = Infinity;
+  S.atoms.forEach(function(a){
+    if (a.id === exceptId) return;
+    var d = Math.hypot(a.x - w.x, a.y - w.y);
+    if (d < r && d < bd) { best = a; bd = d; }
+  });
+  return best;
+}
+function hitBond(w){
+  var r = clamp(HIT_BOND / S.view.s, 7, 14), am = atomMap(), best = null, bd = Infinity;
+  S.bonds.forEach(function(b){
+    var A = am[b.a], B = am[b.b]; if (!A || !B) return;
+    var dx = B.x - A.x, dy = B.y - A.y, l2 = dx * dx + dy * dy || 1;
+    var t = clamp(((w.x - A.x) * dx + (w.y - A.y) * dy) / l2, 0, 1);
+    var d = Math.hypot(A.x + t * dx - w.x, A.y + t * dy - w.y);
+    if (d < r && d < bd) { best = b; bd = d; }
+  });
+  return best;
+}
+
+/* ---------- Zeiger (Finger, Stift, Maus) ---------- */
+var pointers = {}, gesture = null;
+function pointerCount(){ return Object.keys(pointers).length; }
+function startPinch(){
+  if (gesture && gesture.type === 'bond') S.overlay = null;
+  if (gesture && gesture.type === 'move' && gesture.moved) { save(); }
+  if (gesture && gesture.type === 'rect') S.overlay = null;
+  var ids = Object.keys(pointers), p1 = pointers[ids[0]], p2 = pointers[ids[1]];
+  var m = { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
+  gesture = { type:'pinch', d0: Math.hypot(p1.x - p2.x, p1.y - p2.y) || 1, w0: toWorld(m), s0: S.view.s };
+  render();
+}
+svg.addEventListener('pointerdown', function(e){
+  if (e.pointerType === 'mouse' && e.button !== 0) return;
+  try { svg.setPointerCapture(e.pointerId); } catch (x) {}
+  pointers[e.pointerId] = pt(e);
+  var n = pointerCount();
+  if (n === 2) { startPinch(); return; }
+  if (n > 2) return;
+  var p = pt(e), w = toWorld(p);
+  var a = hitAtom(w), b = a ? null : hitBond(w);
+  gesture = { type:'pending', id:e.pointerId, start:p, startW:w, atom:a, bond:b, moved:false,
+              view0:{ tx:S.view.tx, ty:S.view.ty }, shift:e.shiftKey };
+  if (S.hover) { S.hover = null; render(); }
+});
+svg.addEventListener('pointermove', function(e){
+  var p = pt(e);
+  if (pointers[e.pointerId]) pointers[e.pointerId] = p;
+  if (!gesture) {
+    if (e.pointerType === 'mouse') {
+      var w0 = toWorld(p), a0 = hitAtom(w0), b0 = a0 ? null : hitBond(w0);
+      var hv = a0 ? { t:'a', id:a0.id } : b0 ? { t:'b', id:b0.id } : null;
+      var old = S.hover;
+      if ((old && hv && (old.t !== hv.t || old.id !== hv.id)) || (!old) !== (!hv)) { S.hover = hv; render(); }
+      svg.style.cursor = hv ? 'pointer' : (S.mode === 'draw' ? 'crosshair' : 'default');
+    }
+    return;
+  }
+  if (gesture.type === 'pinch') {
+    var ids = Object.keys(pointers); if (ids.length < 2) return;
+    var p1 = pointers[ids[0]], p2 = pointers[ids[1]];
+    var d = Math.hypot(p1.x - p2.x, p1.y - p2.y), m = { x:(p1.x + p2.x) / 2, y:(p1.y + p2.y) / 2 };
+    var s = clamp(gesture.s0 * d / gesture.d0, 0.3, 3.5);
+    S.view.s = s; S.view.tx = m.x - gesture.w0.x * s; S.view.ty = m.y - gesture.w0.y * s;
+    render(); return;
+  }
+  if (e.pointerId !== gesture.id) return;
+  var w = toWorld(p);
+  if (!gesture.moved) {
+    if (Math.hypot(p.x - gesture.start.x, p.y - gesture.start.y) < TAP_SLOP) return;
+    gesture.moved = true;
+    if (S.mode === 'draw') {
+      gesture.type = gesture.atom ? 'bond' : 'pan';
+    } else {
+      if (gesture.atom) {
+        commit();
+        gesture.type = 'move';
+        gesture.moving = S.selA[gesture.atom.id] ? selectedAtoms() : [gesture.atom];
+        gesture.orig = gesture.moving.map(function(a){ return { a:a, x:a.x, y:a.y }; });
+      } else gesture.type = 'rect';
+    }
+  }
+  if (gesture.type === 'pan') {
+    S.view.tx = gesture.view0.tx + (p.x - gesture.start.x);
+    S.view.ty = gesture.view0.ty + (p.y - gesture.start.y);
+  } else if (gesture.type === 'bond') {
+    var t = hitAtom(w, gesture.atom.id);
+    S.overlay = { t:'rubber', from:gesture.atom.id, target: t ? t.id : null, x:w.x, y:w.y };
+  } else if (gesture.type === 'move') {
+    var dx = w.x - gesture.startW.x, dy = w.y - gesture.startW.y;
+    gesture.orig.forEach(function(o){ o.a.x = o.x + dx; o.a.y = o.y + dy; });
+  } else if (gesture.type === 'rect') {
+    S.overlay = { t:'rect', x1:gesture.startW.x, y1:gesture.startW.y, x2:w.x, y2:w.y };
+  }
+  render();
+});
+function endPointer(e, cancelled){
+  delete pointers[e.pointerId];
+  if (!gesture) return;
+  if (gesture.type === 'pinch') { if (!pointerCount()) gesture = null; return; }
+  if (e.pointerId !== gesture.id) return;
+  var g = gesture; gesture = null;
+  var w = toWorld(pt(e));
+  if (cancelled) {
+    S.overlay = null;
+    if (g.type === 'move') changed(); else render();
+    return;
+  }
+  if (g.type === 'pending') { tap(g); return; }
+  if (g.type === 'bond') {
+    S.overlay = null;
+    var t = hitAtom(w, g.atom.id);
+    if (t) {
+      var ex = findBond(g.atom.id, t.id);
+      if (ex) cycleBond(ex);
+      else { commit(); addBond(g.atom.id, t.id, 1); changed(); }
+    } else {
+      var dx = w.x - g.atom.x, dy = w.y - g.atom.y, d = Math.hypot(dx, dy);
+      if (d < L * 0.4) { render(); return; }
+      var ang = Math.round(deg(Math.atan2(dy, dx)) / 15) * 15, len = d < L * 1.5 ? L : d;
+      commit();
+      var nAtom = addAtom(g.atom.x + len * Math.cos(rad(ang)), g.atom.y + len * Math.sin(rad(ang)), S.el);
+      addBond(g.atom.id, nAtom.id, 1);
+      changed();
+    }
+    return;
+  }
+  if (g.type === 'move') { changed(); return; }
+  if (g.type === 'rect') {
+    var ov = S.overlay; S.overlay = null;
+    if (ov) {
+      var x1 = Math.min(ov.x1, ov.x2), x2 = Math.max(ov.x1, ov.x2), y1 = Math.min(ov.y1, ov.y2), y2 = Math.max(ov.y1, ov.y2);
+      if (!g.shift) clearSel();
+      S.atoms.forEach(function(a){ if (a.x >= x1 && a.x <= x2 && a.y >= y1 && a.y <= y2) S.selA[a.id] = true; });
+      S.bonds.forEach(function(b){ if (S.selA[b.a] && S.selA[b.b]) S.selB[b.id] = true; });
+    }
+    render(); updateUI();
+    return;
+  }
+  render();
+}
+svg.addEventListener('pointerup', function(e){ endPointer(e, false); });
+svg.addEventListener('pointercancel', function(e){ endPointer(e, true); });
+svg.addEventListener('pointerleave', function(e){ if (e.pointerType === 'mouse' && S.hover && !gesture) { S.hover = null; render(); } });
+svg.addEventListener('contextmenu', function(e){ e.preventDefault(); });
+
+function tap(g){
+  if (S.mode === 'draw') {
+    if (g.atom) growFrom(g.atom);
+    else if (g.bond) cycleBond(g.bond);
+    else { commit(); addAtom(g.startW.x, g.startW.y, S.el); changed(); }
+  } else {
+    if (g.atom) { if (S.selA[g.atom.id]) delete S.selA[g.atom.id]; else S.selA[g.atom.id] = true; }
+    else if (g.bond) { if (S.selB[g.bond.id]) delete S.selB[g.bond.id]; else S.selB[g.bond.id] = true; }
+    else clearSel();
+    render(); updateUI();
+  }
+}
+
+svg.addEventListener('wheel', function(e){
+  e.preventDefault();
+  var p = pt(e);
+  if (e.ctrlKey || e.metaKey) zoomAt(p, Math.exp(-e.deltaY * 0.01));
+  else { S.view.tx -= e.deltaX; S.view.ty -= e.deltaY; render(); }
+}, { passive:false });
+
+/* ---------- Ansicht ---------- */
+function stageSize(){ var r = svg.getBoundingClientRect(); return { w: r.width || 800, h: r.height || 500 }; }
+function zoomAt(p, f){
+  var w = toWorld(p), s = clamp(S.view.s * f, 0.3, 3.5);
+  S.view.s = s; S.view.tx = p.x - w.x * s; S.view.ty = p.y - w.y * s;
+  render();
+}
+function fitView(){
+  var sz = stageSize();
+  if (!S.atoms.length) { S.view = { s:1, tx:sz.w / 2, ty:sz.h / 2 }; render(); return; }
+  var x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity;
+  S.atoms.forEach(function(a){ x1 = Math.min(x1, a.x); y1 = Math.min(y1, a.y); x2 = Math.max(x2, a.x); y2 = Math.max(y2, a.y); });
+  var pad = 70, bottomPad = S.mode === 'select' ? 120 : 40;
+  var bw = x2 - x1 + 2 * pad, bh = y2 - y1 + 2 * pad;
+  var s = clamp(Math.min(sz.w / bw, (sz.h - bottomPad) / bh), 0.3, 1.6);
+  S.view.s = s;
+  S.view.tx = sz.w / 2 - (x1 + x2) / 2 * s;
+  S.view.ty = (sz.h - bottomPad) / 2 - (y1 + y2) / 2 * s;
+  render();
+}
+var lastSize = null;
+function onResize(){
+  sizePSE();
+  var sz = stageSize();
+  if (lastSize) { S.view.tx += (sz.w - lastSize.w) / 2; S.view.ty += (sz.h - lastSize.h) / 2; }
+  lastSize = sz;
+  render();
+}
+if (window.ResizeObserver) new ResizeObserver(onResize).observe(stage);
+window.addEventListener('resize', onResize);
+
+/* ---------- Antwortcode ---------- */
+function smallestRings(n, adj){
+  var res = [];
+  for (var i = 0; i < n; i++) res.push(0);
+  for (var u = 0; u < n; u++) {
+    adj[u].forEach(function(e){
+      var v = e[0]; if (v < u) return;
+      var dist = {}, queue = [u]; dist[u] = 0;
+      while (queue.length) {
+        var x = queue.shift();
+        if (x === v) break;
+        adj[x].forEach(function(f){
+          var y = f[0];
+          if ((x === u && y === v) || (x === v && y === u)) return;
+          if (dist[y] === undefined) { dist[y] = dist[x] + 1; queue.push(y); }
+        });
+      }
+      if (dist[v] !== undefined) {
+        var len = dist[v] + 1;
+        res[u] = res[u] ? Math.min(res[u], len) : len;
+        res[v] = res[v] ? Math.min(res[v], len) : len;
+      }
+    });
+  }
+  return res;
+}
+function rankStrings(arr){
+  var uniq = arr.slice().sort().filter(function(s, i, a){ return i === 0 || s !== a[i - 1]; });
+  var m = {}; uniq.forEach(function(s, i){ m[s] = i; });
+  return arr.map(function(s){ return m[s]; });
+}
+function canonicalDescription(atoms, bonds){
+  var n = atoms.length, idx = {}, adj = [], i;
+  atoms.forEach(function(a, k){ idx[a.id] = k; adj.push([]); });
+  bonds.forEach(function(b){
+    var x = idx[b.a], y = idx[b.b];
+    if (x === undefined || y === undefined) return;
+    adj[x].push([y, b.order]); adj[y].push([x, b.order]);
+  });
+  var ring = smallestRings(n, adj);
+  var labels = atoms.map(function(a, k){ return [a.el, a.q | 0, a.lp | 0, a.rad | 0, ring[k]].join(','); });
+  var col = rankStrings(labels), classes = new Set(col).size;
+  for (var it = 0; it <= n; it++) {
+    var sig = col.map(function(c, k){ return c + '(' + adj[k].map(function(e){ return e[1] + ':' + col[e[0]]; }).sort().join(' ') + ')'; });
+    var nc = rankStrings(sig), kk = new Set(nc).size;
+    col = nc;
+    if (kk === classes) break;
+    classes = kk;
+  }
+  var groups = {};
+  for (i = 0; i < n; i++) {
+    if (!groups[col[i]]) groups[col[i]] = { label: labels[i], count: 0, nb: adj[i].map(function(e){ return e[1] + ':' + col[e[0]]; }).sort().join(' ') };
+    groups[col[i]].count++;
+  }
+  return 'v' + CODE_VERSION + '|' + Object.keys(groups).map(Number).sort(function(a, b){ return a - b; }).map(function(k){
+    var g = groups[k]; return k + '=' + g.label + 'x' + g.count + '[' + g.nb + ']';
+  }).join(';');
+}
+function hash64(str){
+  var h1 = 0xdeadbeef, h2 = 0x41c6ce57;
+  for (var i = 0; i < str.length; i++) {
+    var ch = str.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507); h1 ^= Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507); h2 ^= Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return [h1 >>> 0, h2 >>> 0];
+}
+var ALPHA = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+function answerCode(atoms, bonds){
+  if (!atoms.length) return '';
+  var h = hash64(canonicalDescription(atoms, bonds)), s = '';
+  for (var k = 0; k < 6; k++) s += ALPHA[(h[0] >>> (5 * k)) & 31];
+  s += ALPHA[((h[0] >>> 30) | ((h[1] & 7) << 2)) & 31];
+  s += ALPHA[(h[1] >>> 3) & 31];
+  return s;
+}
+function drawingCode(){
+  var idx = {};
+  S.atoms.forEach(function(a, i){ idx[a.id] = i; });
+  return 'LEWIS1/' + S.atoms.map(function(a){ return [a.el, Math.round(a.x), Math.round(a.y), a.lp | 0, a.q | 0, a.rad | 0].join(','); }).join(';') +
+    '/' + S.bonds.map(function(b){ return [idx[b.a], idx[b.b], b.order].join(','); }).join(';');
+}
+function parseDrawingCode(str){
+  var s = String(str).replace(/\s+/g, '');
+  var m = s.match(/^LEWIS1\/([^\/]*)\/([^\/]*)$/i);
+  if (!m) throw new Error('Das ist kein Zeichnungscode. Er beginnt mit «LEWIS1/».');
+  var atoms = [], bonds = [], id = 1;
+  if (m[1]) m[1].split(';').forEach(function(t){
+    var p = t.split(',');
+    if (!SYM[p[0]]) throw new Error('Unbekanntes Element: ' + p[0]);
+    atoms.push({ id:id++, el:p[0], x:+p[1] || 0, y:+p[2] || 0, lp:clamp(p[3] | 0, 0, MAX_LP), q:clamp(p[4] | 0, -MAX_Q, MAX_Q), rad:clamp(p[5] | 0, 0, MAX_RAD) });
+  });
+  if (m[2]) m[2].split(';').forEach(function(t){
+    var p = t.split(',').map(Number);
+    if (!atoms[p[0]] || !atoms[p[1]] || p[0] === p[1]) throw new Error('Der Code ist beschädigt.');
+    bonds.push({ id:id++, a:atoms[p[0]].id, b:atoms[p[1]].id, order:clamp(p[2] | 0, 1, 3) });
+  });
+  return { atoms:atoms, bonds:bonds, nextId:id };
+}
+function replaceDrawing(d){
+  commit();
+  S.atoms = d.atoms; S.bonds = d.bonds; S.nextId = d.nextId;
+  clearSel(); changed(); fitView();
+}
+
+/* ---------- Dialoge ---------- */
+var openDlg = null, lastFocus = null;
+function openDialog(id){
+  lastFocus = document.activeElement;
+  openDlg = $(id); openDlg.classList.add('open');
+  var f = openDlg.querySelector('[data-close]') || openDlg.querySelector('button');
+  if (f) f.focus();
+}
+function closeDialog(){
+  if (!openDlg) return;
+  openDlg.classList.remove('open'); openDlg = null;
+  if (lastFocus && lastFocus.focus) lastFocus.focus();
+}
+document.querySelectorAll('.overlay').forEach(function(o){
+  o.addEventListener('click', function(e){ if (e.target === o || e.target.hasAttribute('data-close')) closeDialog(); });
+});
+
+var toastTimer = null;
+function toast(msg, kind){
+  var t = $('toast');
+  t.textContent = msg; t.className = 'on' + (kind ? ' ' + kind : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function(){ t.className = ''; }, 3800);
+}
+function copyText(text, input){
+  var done = function(ok){ toast(ok ? 'Kopiert. Jetzt in isTest ins Antwortfeld einfügen.' : 'Kopieren geht hier nicht. Bitte den Code abtippen.'); };
+  var fallback = function(){
+    try {
+      if (input) { input.focus(); input.select(); input.setSelectionRange(0, 9999); done(document.execCommand('copy')); return; }
+    } catch (e) {}
+    done(false);
+  };
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(function(){ done(true); }, fallback);
+    else fallback();
+  } catch (e) { fallback(); }
+}
+function showCode(){
+  var body = $('codeBody');
+  if (!S.atoms.length) {
+    body.innerHTML = '<p>Du hast noch nichts gezeichnet.</p>';
+    openDialog('dlgCode'); return;
+  }
+  var code = answerCode(S.atoms, S.bonds), mode = CONFIG.abgabe;
+  var html = '';
+  if (mode !== 'zeichnung') {
+    html += '<p>Trage diesen Code in isTest ins Antwortfeld ein:</p>' +
+      '<input class="codebox" id="codeOut" readonly value="' + code + '" aria-label="Antwortcode">' +
+      '<div class="row"><button class="btn primary" id="copyCode">Kopieren</button></div>' +
+      '<p class="muted">Der Code gehört genau zu dieser Zeichnung. Änderst du danach etwas, ändert sich auch der Code.</p>';
+  }
+  if (mode === 'zeichnung' || mode === 'beide') {
+    var dc = drawingCode();
+    html += '<p>' + (mode === 'beide' ? 'Falls verlangt, zusätzlich diesen Zeichnungscode einfügen:' : 'Kopiere diesen Zeichnungscode in isTest ins Antwortfeld:') + '</p>' +
+      '<textarea class="longbox" id="drawOut" readonly aria-label="Zeichnungscode">' + dc + '</textarea>' +
+      '<div class="row"><button class="btn' + (mode === 'zeichnung' ? ' primary' : '') + '" id="copyDraw">Zeichnungscode kopieren</button></div>';
+  }
+  body.innerHTML = html;
+  if ($('copyCode')) $('copyCode').addEventListener('click', function(){ copyText(code, $('codeOut')); });
+  if ($('copyDraw')) $('copyDraw').addEventListener('click', function(){ copyText(drawingCode(), $('drawOut')); });
+  openDialog('dlgCode');
+}
+var solutions = String(CONFIG.loesung || '').toUpperCase().split(/[\s,;]+/).filter(Boolean);
+function check(){
+  if (!S.atoms.length) { toast('Zeichne zuerst eine Lewis-Formel.'); return; }
+  var c = answerCode(S.atoms, S.bonds);
+  if (solutions.indexOf(c) >= 0) toast('Richtig! Deine Lewis-Formel stimmt.', 'good');
+  else toast('Noch nicht richtig. Kontrolliere Bindungen, freie Elektronenpaare und Ladungen.', 'bad');
+}
+
+/* ---------- Beispiele ---------- */
+var EXAMPLES = {
+  h2o: 'LEWIS1/O,0,0,2,0,0;H,-50,34,0,0,0;H,50,34,0,0,0/0,1,1;0,2,1',
+  co2: 'LEWIS1/O,-60,0,2,0,0;C,0,0,0,0,0;O,60,0,2,0,0/0,1,2;1,2,2',
+  nh4: 'LEWIS1/N,0,0,0,1,0;H,60,0,0,0,0;H,-60,0,0,0,0;H,0,-60,0,0,0;H,0,60,0,0,0/0,1,1;0,2,1;0,3,1;0,4,1'
+};
+
+/* ---------- Knöpfe ---------- */
+$('modeDraw').addEventListener('click', function(){ setMode('draw'); });
+$('modeSelect').addEventListener('click', function(){ setMode('select'); });
+$('undoBtn').addEventListener('click', undo);
+$('redoBtn').addEventListener('click', redo);
+$('zoomIn').addEventListener('click', function(){ var z = stageSize(); zoomAt({ x:z.w / 2, y:z.h / 2 }, 1.25); });
+$('zoomOut').addEventListener('click', function(){ var z = stageSize(); zoomAt({ x:z.w / 2, y:z.h / 2 }, 0.8); });
+$('fitBtn').addEventListener('click', fitView);
+$('pseToggle').addEventListener('click', function(){ S.pseOpen = !S.pseOpen; updateUI(); });
+$('clearBtn').addEventListener('click', function(){ if (S.atoms.length) openDialog('dlgConfirm'); });
+$('confOk').addEventListener('click', function(){ commit(); S.atoms = []; S.bonds = []; clearSel(); closeDialog(); changed(); fitView(); });
+$('helpBtn').addEventListener('click', function(){ openDialog('dlgHelp'); });
+$('codeBtn').addEventListener('click', showCode);
+$('checkBtn').addEventListener('click', check);
+$('lpAdd').addEventListener('click', function(){ applyToSelected(function(a){ if ((a.lp | 0) >= MAX_LP) return false; a.lp = (a.lp | 0) + 1; return true; }); });
+$('lpDel').addEventListener('click', function(){ applyToSelected(function(a){ if ((a.lp | 0) <= 0) return false; a.lp = (a.lp | 0) - 1; return true; }); });
+$('radAdd').addEventListener('click', function(){ applyToSelected(function(a){ if ((a.rad | 0) >= MAX_RAD) return false; a.rad = (a.rad | 0) + 1; return true; }); });
+$('radDel').addEventListener('click', function(){ applyToSelected(function(a){ if ((a.rad | 0) <= 0) return false; a.rad = (a.rad | 0) - 1; return true; }); });
+$('qPlus').addEventListener('click', function(){ applyToSelected(function(a){ if ((a.q | 0) >= MAX_Q) return false; a.q = (a.q | 0) + 1; return true; }); });
+$('qMinus').addEventListener('click', function(){ applyToSelected(function(a){ if ((a.q | 0) <= -MAX_Q) return false; a.q = (a.q | 0) - 1; return true; }); });
+$('elSwap').addEventListener('click', function(){ applyToSelected(function(a){ if (a.el === S.el) return false; a.el = S.el; return true; }); });
+$('selAll').addEventListener('click', function(){
+  S.atoms.forEach(function(a){ S.selA[a.id] = true; });
+  S.bonds.forEach(function(b){ S.selB[b.id] = true; });
+  render(); updateUI();
+});
+$('delBtn').addEventListener('click', deleteSelection);
+$('loadBtn').addEventListener('click', function(){
+  try { var d = parseDrawingCode($('loadArea').value); replaceDrawing(d); $('loadMsg').textContent = 'Geladen.'; closeDialog(); }
+  catch (e) { $('loadMsg').textContent = e.message; }
+});
+function setLpStyle(st){ S.lpStyle = st; try { localStorage.setItem('lewis-editor:paare', st); } catch (e) {} render(); updateUI(); }
+$('lpStrich').addEventListener('click', function(){ setLpStyle('strich'); });
+$('lpPunkte').addEventListener('click', function(){ setLpStyle('punkte'); });
+document.querySelectorAll('[data-ex]').forEach(function(b){
+  b.addEventListener('click', function(){ replaceDrawing(parseDrawingCode(EXAMPLES[b.getAttribute('data-ex')])); closeDialog(); });
+});
+
+/* ---------- Tastatur ---------- */
+var kbBuf = '', kbTime = 0;
+document.addEventListener('keydown', function(e){
+  var tag = (e.target && e.target.tagName) || '';
+  if (tag === 'TEXTAREA' || tag === 'INPUT') { if (e.key === 'Escape') closeDialog(); return; }
+  if (e.key === 'Escape') { if (openDlg) closeDialog(); else { clearSel(); render(); updateUI(); } return; }
+  if (openDlg) return;
+  var mod = e.ctrlKey || e.metaKey;
+  if (mod && (e.key === 'z' || e.key === 'Z')) { e.preventDefault(); if (e.shiftKey) redo(); else undo(); return; }
+  if (mod && (e.key === 'y' || e.key === 'Y')) { e.preventDefault(); redo(); return; }
+  if (mod || e.altKey) return;
+  if (e.key === 'Delete' || e.key === 'Backspace') { if (S.mode === 'select') { e.preventDefault(); deleteSelection(); } return; }
+  if (e.key === '1') { setMode('draw'); return; }
+  if (e.key === '2') { setMode('select'); return; }
+  if (S.mode === 'select' && (e.key === '+' || e.key === '-')) { $(e.key === '+' ? 'qPlus' : 'qMinus').click(); return; }
+  if (/^[a-zA-Z]$/.test(e.key)) {
+    var now = Date.now();
+    if (kbBuf.length === 1 && now - kbTime < 800) {
+      var two = kbBuf.toUpperCase() + e.key.toLowerCase();
+      if (SYM[two] && isAllowed(two)) { setElement(two); kbBuf = ''; return; }
+    }
+    kbBuf = e.key; kbTime = now;
+    var one = e.key.toUpperCase();
+    if (SYM[one]) setElement(one);
+  }
+});
+
+/* ---------- Start ---------- */
+$('cv').textContent = CODE_VERSION;
+if (CONFIG.aufgabe) { $('task').textContent = CONFIG.aufgabe; $('task').hidden = false; }
+if (!CONFIG.radikale) $('radGroup').hidden = true;
+if (solutions.length) $('checkBtn').hidden = false;
+buildPSE();
+sizePSE();
+if (window.innerHeight < 620) S.pseOpen = false;
+var hadSaved = loadSaved();
+updateUI();
+lastSize = stageSize();
+if (hadSaved) fitView(); else { S.view = { s:1, tx:lastSize.w / 2, ty:lastSize.h / 2 }; render(); }
+
+// Für automatische Tests
+window.LewisEditor = { state:S, answerCode:answerCode, drawingCode:drawingCode, parseDrawingCode:parseDrawingCode, canonicalDescription:canonicalDescription };
+})();
+</script>
+</body>
+</html>
